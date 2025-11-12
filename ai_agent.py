@@ -7,8 +7,8 @@ then performs a small vulnerability & executable-service analysis and
 outputs a human-friendly report + agent_report.json.
 
 Usage examples:
-  python3 ai_agent.py --network 192.168.1.0/24 --mode ping --ports 22,80,443
-  python3 ai_agent.py --hosts 192.168.1.10 192.168.1.20 --ports 1-1024
+  python3 ai_agent.py --network <ip> --mode ping --ports <ports>
+  python3 ai_agent.py --hosts <ip1, ip2> --ports <range e.g, 1-24>
 """
 
 import argparse
@@ -23,8 +23,6 @@ from typing import Dict, Any, List
 # ---------------------------
 # Lightweight local "vuln DB"
 # ---------------------------
-# Map substrings that may appear in banners -> short vuln description.
-# Expand to include things you care about.
 KNOWN_VULNS = {
     "apache/2.4.49": "CVE-2021-41773 (path traversal / RCE in some configs)",
     "apache/2.4.50": "CVE-2021-44224 (mod_proxy) / check vendor advisory",
@@ -92,25 +90,21 @@ def analyze_results(results: Dict[str, Any]) -> Dict[str, Any]:
             "anomaly_score": None,
             "notes": []
         }
-        # anomaly score if present
         anomaly = host.get("anomaly")
         if anomaly and "score" in anomaly:
             host_report["anomaly_score"] = anomaly["score"]
 
-        # iterate ports (keys are strings in network_scanner)
         for port_str, pinfo in host.get("ports", {}).items():
             port = int(port_str)
             if pinfo.get("open"):
                 banner = pinfo.get("banner") or ""
                 host_report["open_ports"].append({"port": port, "banner": banner, "latency_ms": pinfo.get("latency_ms")})
 
-                # check known vuln patterns
                 banner_l = banner.lower()
                 for pattern, info in KNOWN_VULNS.items():
                     if pattern in banner_l:
                         host_report["vulns"].append({"port": port, "banner": banner.strip(), "match": pattern, "info": info})
 
-                # executable/service port heuristic
                 if port in EXECUTABLE_PORTS:
                     host_report["executable_ports"].append(port)
 
@@ -160,7 +154,7 @@ def print_human_report(analysis: Dict[str, Any]):
         print("-"*60)
 
 # ---------------------------
-# Main agent logic
+# Core agent logic
 # ---------------------------
 def build_scanner_from_args(scanner_mod, args) -> Any:
     """Given the imported scanner module and parsed args, construct NetworkScanner."""
@@ -178,7 +172,6 @@ def build_scanner_from_args(scanner_mod, args) -> Any:
 async def run_scan_and_analyze(scanner) -> Dict[str, Any]:
     # run scanner.run() (it's async)
     results = await scanner.run()
-    # results should be the dict of hosts -> host_res
     analysis = analyze_results(results)
     return analysis
 
@@ -197,7 +190,6 @@ def main():
     parser.add_argument("--out", default="agent_report.json", help="Agent JSON output path")
     args = parser.parse_args()
 
-    # load scanner module
     try:
         scanner_mod = load_scanner_module(args.scanner_path)
     except Exception as e:
@@ -206,7 +198,6 @@ def main():
 
     # borrow default ports from the scanner if user didn't specify
     if not args.ports:
-        # scanner module should expose DEFAULT_PORTS and parse_ports
         if hasattr(scanner_mod, "DEFAULT_PORTS"):
             args.ports = ",".join(map(str, getattr(scanner_mod, "DEFAULT_PORTS")))
         else:
@@ -219,7 +210,6 @@ def main():
         print(f"Error building scanner: {e}")
         sys.exit(1)
 
-    # run & analyze
     try:
         analysis = asyncio.run(run_scan_and_analyze(scanner))
     except KeyboardInterrupt:
@@ -229,7 +219,6 @@ def main():
         print(f"Error during scan: {e}")
         sys.exit(1)
 
-    # print & save analysis
     print_human_report(analysis)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(analysis, f, indent=2)

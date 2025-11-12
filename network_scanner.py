@@ -5,8 +5,8 @@ network_scanner.py
 Async, configurable network scanner with simple anomaly detection and JSON/CSV export.
 
 Usage examples:
-  sudo python3 network_scanner.py --network 192.168.1.0/24 --mode arp
-  python3 network_scanner.py --hosts 192.168.1.10 192.168.1.20 --ports 22,80,443,8080
+  sudo python3 network_scanner.py --network <ip/port> --mode arp
+  python3 network_scanner.py --hosts <ip1, ip2> --ports 22,80,443,8080
 """
 
 import argparse
@@ -32,13 +32,10 @@ DEFAULT_PORTS = [
     21, 22, 23, 25, 53, 67, 68, 80, 110, 123, 139, 143, 161, 162, 389, 443, 445,
     587, 631, 636, 993, 995, 3306, 3389, 5900, 8080, 8443
 ]
-# Add more common ports if desired
 
-# ---------- Utilities ----------
 def now_ts() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
-# ---------- Discovery ----------
 def arp_discover(network_cidr: str, timeout: int = 2) -> List[str]:
     """
     ARP discovery using scapy. Requires root privileges on most platforms.
@@ -111,7 +108,7 @@ async def tcp_connect_scan(ip: str, ports: List[int], timeout: float = 1.0, conc
                 reader, writer = await asyncio.wait_for(fut, timeout=timeout)
                 latency = (time.time() - start) * 1000.0
                 banner = None
-                # Try to grab a short banner (non-blocking)
+                # A short banner (non-blocking)
                 try:
                     writer.write(b"\r\n")
                     await writer.drain()
@@ -167,7 +164,6 @@ def simple_anomaly_score(scan_result: Dict[str, Any], common_ports=DEFAULT_PORTS
     score = min(score, 10.0)
     return {"score": round(score, 2), "notes": notes, "open_ports": host_open_ports}
 
-# ---------- Orchestrator ----------
 class NetworkScanner:
     def __init__(self, network=None, hosts: List[str] = None, ports: List[int] = None,
                  use_arp: bool = True, concurrency: int = 400, timeout: float = 1.0):
@@ -307,61 +303,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# --- Add this to the bottom of network_scanner.py ---
-
-import asyncio
-from typing import Optional, List, Dict, Any
-
-async def _run_scan(network: Optional[str] = None,
-                    hosts: Optional[List[str]] = None,
-                    ports: Optional[List[int]] = None,
-                    use_arp: bool = True,
-                    concurrency: int = 400,
-                    timeout: float = 1.0) -> Dict[str, Any]:
-    """
-    Async helper that wraps NetworkScanner.run() and returns raw results.
-
-    :param network: CIDR string (e.g. '192.168.1.0/24') or None if specifying hosts directly.
-    :param hosts: List of IPs to scan directly (bypasses discovery).
-    :param ports: List of ports to scan (defaults to DEFAULT_PORTS).
-    :param use_arp: If True and scapy is available, use ARP for discovery.
-    :param concurrency: Maximum number of concurrent host/port probes.
-    :param timeout: Per-connection timeout in seconds.
-    :return: Dictionary keyed by IP with scan details and anomaly scores.
-    """
-    scanner = NetworkScanner(network=network,
-                             hosts=hosts,
-                             ports=ports,
-                             use_arp=use_arp,
-                             concurrency=concurrency,
-                             timeout=timeout)
-    await scanner.run()
-    return scanner.results
-
-def scan_agent(network: Optional[str] = None,
-               hosts: Optional[List[str]] = None,
-               ports: Optional[List[int]] = None,
-               use_arp: bool = True,
-               concurrency: int = 400,
-               timeout: float = 1.0) -> Dict[str, Any]:
-    """
-    Synchronous wrapper for clients who want to call this module like an agent.
-    Blocks until the async scan completes and returns the scan results.
-
-    Usage:
-        from network_scanner import scan_agent
-        results = scan_agent(network='192.168.1.0/24', ports=[22, 80, 443])
-        # process results...
-    """
-    if not network and not hosts:
-        raise ValueError("You must provide either a network CIDR or a list of hosts to scan.")
-    return asyncio.run(_run_scan(network=network,
-                                 hosts=hosts,
-                                 ports=ports,
-                                 use_arp=use_arp,
-                                 concurrency=concurrency,
-                                 timeout=timeout))
-
 
