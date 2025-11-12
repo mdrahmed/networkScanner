@@ -1,0 +1,23 @@
+{
+  "summary": {
+    "hosts_scanned": 1,
+    "high_risk_count": 0,
+    "high_risk_hosts": []
+  },
+  "hosts": [
+    {
+      "ip": "127.0.0.1",
+      "open_ports": [
+        {
+          "port": 3000,
+          "banner": "",
+          "latency_ms": 0.32
+        }
+      ],
+      "vulns": [],
+      "executable_ports": [],
+      "anomaly_score": 3.0,
+      "notes": []
+    }
+  ]
+}
