@@ -1,4 +1,4 @@
-## AI Agent — Network Scan & Vulnerability Reporter
+## GenAI Agent — Network Scan & Vulnerability Reporter
 This ai agent can scan the network to discover live hosts, identify open ports and services, and surface likely risky or vulnerable findings.
 
 Key features
